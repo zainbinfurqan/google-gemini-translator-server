@@ -91,7 +91,6 @@ async function convertTextToAudio(text, languageCode = 'es-ES') { // Default to 
   fs.writeFileSync(outputFilePath, response.audioContent, 'binary');
   console.log('Audio content written to file: ' + outputFilePath);
 }
-
 // Example usage
 convertTextToAudio('Hi I am zain ahmed, working at dominos', 'fr-FR');
 })
