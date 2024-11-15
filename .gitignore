@@ -10,6 +10,7 @@
 
 # production
 /build
+.npmignore
 
 # misc
 .DS_Store

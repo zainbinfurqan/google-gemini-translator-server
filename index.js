@@ -1,58 +1,75 @@
 const express = require('express')
 const app = express()
-const port = 3000
+const port = 3001
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { GoogleAIFileManager, FileState  } = require('@google/generative-ai/server')
 const textToSpeech = require('@google-cloud/text-to-speech');
 const fs = require('fs');
+const https = require('https');
 const path = require('path');
+require('dotenv').config()
 
-// client id 1171866073-kh60kbss29qo0gmrk9j6p0te974csssi.apps.googleusercontent.com
+const cors = require('cors');
+const { default: axios } = require('axios')
+app.options('*', cors());
+app.use(cors());
 
-const speechToText = async () => {
+const speechToText = async (language, url, res) => {
   const fileManager = new GoogleAIFileManager('');
-  const uploadResult = await fileManager.uploadFile(
-    `media/intro.mp3`,
-    {
-      mimeType: "audio/mp3",
-      displayName: "Audio sample",
-    },
-  );
-  let file = await fileManager.getFile(uploadResult.file.name);
-  while (file.state === FileState.PROCESSING) {
-    process.stdout.write(".");
-    // Sleep for 10 seconds
-    await new Promise((resolve) => setTimeout(resolve, 10_000));
-    // Fetch the file from the API again
-    file = await fileManager.getFile(uploadResult.file.name);
-  }
+  try {
+    const a = 'media/'+Date()+'.mp3'
+    const localPath  = fs.createWriteStream('./'+a)
 
-  if (file.state === FileState.FAILED) {
-    throw new Error("Audio processing failed.");
-  }
+    https.get(url, async (response)=> {
+
+       response.pipe(localPath)
+       
+       setTimeout( async () => {
+      
+      const uploadResult = await fileManager.uploadFile(a,{
+        mimeType: "audio/mp3",
+        displayName: "Audio sample",
+      });
+
+      let file = await fileManager.getFile(uploadResult.file.name);
+
+      while (file.state === FileState.PROCESSING) {
+        process.stdout.write(".");
+        await new Promise((resolve) => setTimeout(resolve, 10_000));
+        file = await fileManager.getFile(uploadResult.file.name);
+      }
+
+      if (file.state === FileState.FAILED) {
+        throw new Error("Audio processing failed.");
+      }
   
-  // View the response.
-  console.log(
-    `Uploaded file ${uploadResult.file.displayName} as: ${uploadResult.file.uri}`,
-  );
+      console.log(
+        `Uploaded file ${uploadResult.file.displayName} as: ${uploadResult.file.uri}`,
+      );
+      
+      const genAI = new GoogleGenerativeAI('');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent([
+      `convert the audio in text and translate the text in ${language} language`,
+        {
+          fileData: {
+            fileUri: uploadResult.file.uri,
+            mimeType: uploadResult.file.mimeType,
+          },
+        },
+      ]);
+      res.json(result.response.text())
+      return  result.response.text()
+      }, 2000);
+    })
 
-  const genAI = new GoogleGenerativeAI('');
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-const result = await model.generateContent([
-  "convert the audio in text.",
-  {
-    fileData: {
-      fileUri: uploadResult.file.uri,
-      mimeType: uploadResult.file.mimeType,
-    },
-  },
-]);
-console.log(result.response.text());
+  } catch (error) {
+      console.error('Error fetching data:', error.message);
+  }
 }
 
-app.get('/text-to-speech', (req, res) => {
-  speechToText()
-  res.send('Hello World!')
+app.get('/speech-to-text', async (req, res) => {
+  await speechToText(req.query.language,req.query.url, res)
 })
 
 app.get('/convert-text-to-speech', async (req,res)=>{
