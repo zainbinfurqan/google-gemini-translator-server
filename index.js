@@ -95,6 +95,10 @@ async function convertTextToAudio(text, languageCode = 'es-ES') { // Default to 
 convertTextToAudio('Hi I am zain ahmed, working at dominos', 'fr-FR');
 })
 
+app.get('/translate', async (req,res)=>{
+  res.json("working...")
+})
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
