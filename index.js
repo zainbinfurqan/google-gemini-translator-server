@@ -15,10 +15,10 @@ app.options('*', cors());
 app.use(cors());
 
 const speechToText = async (language, url, res) => {
-  const fileManager = new GoogleAIFileManager('');
+  const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
   try {
-    const a = 'media/'+Date()+'.mp3'
-    const localPath  = fs.createWriteStream('./'+a)
+    const fileName = 'media/'+Date()+'.mp3'
+    const localPath  = fs.createWriteStream('./'+fileName)
 
     https.get(url, async (response)=> {
 
@@ -26,7 +26,7 @@ const speechToText = async (language, url, res) => {
        
        setTimeout( async () => {
       
-      const uploadResult = await fileManager.uploadFile(a,{
+      const uploadResult = await fileManager.uploadFile(fileName,{
         mimeType: "audio/mp3",
         displayName: "Audio sample",
       });
@@ -47,7 +47,7 @@ const speechToText = async (language, url, res) => {
         `Uploaded file ${uploadResult.file.displayName} as: ${uploadResult.file.uri}`,
       );
       
-      const genAI = new GoogleGenerativeAI('');
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const result = await model.generateContent([
       `convert the audio in text and translate the text in ${language} language`,
@@ -94,8 +94,6 @@ async function convertTextToAudio(text, languageCode = 'es-ES') { // Default to 
 // Example usage
 convertTextToAudio('Hi I am zain ahmed, working at dominos', 'fr-FR');
 })
-
-
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
