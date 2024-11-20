@@ -62,7 +62,6 @@ const speechToText = async (language, url, res) => {
             },
           },
         ]);
-        console.log("result.response.text()",result.response.text())
         res.json(result.response.text())
         // return  result.response.text()
         }, 2000);
@@ -77,8 +76,6 @@ const speechToText = async (language, url, res) => {
 
 const router = Router();
 router.get("/hello", async (req, res) => {
-  console.log(req.query.language)
-  console.log(req.query.url)
   if(req.query.language && req.query.url){
     await speechToText(req.query.language,req.query.url, res)
   }else{
