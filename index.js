@@ -15,19 +15,25 @@ const { default: axios } = require('axios')
 app.options('*', cors());
 app.use(cors());
 
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//   api_key: process.env.CLOUDINARY_API_KEY,
+//   api_secret: process.env.CLOUDINARY_API_SECRET
+// });
+
 const speechToText = async (language, url, res) => {
   const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
   try {
     const fileName = 'media/'+Date()+'.mp3'
     const localPath  = fs.createWriteStream('./'+fileName)
 
-    https.get(url, async (response)=> {
+    // https.get(url, async (response)=> {
 
-       response.pipe(localPath)
+      //  response.pipe(localPath)
        
        setTimeout( async () => {
       
-      const uploadResult = await fileManager.uploadFile(fileName,{
+      const uploadResult = await fileManager.uploadFile('https://asset.cloudinary.com/zainahmed/c556f323d5036708a186475ab7d82b86',{
         mimeType: "audio/mp3",
         displayName: "Audio sample",
       });
@@ -51,7 +57,7 @@ const speechToText = async (language, url, res) => {
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const result = await model.generateContent([
-      `convert the audio in text and translate the text in ${language} language`,
+      `convert the audio in text and translate the text in ${'german'} language`,
         {
           fileData: {
             fileUri: uploadResult.file.uri,
@@ -62,7 +68,7 @@ const speechToText = async (language, url, res) => {
       res.json(result.response.text())
       return  result.response.text()
       }, 2000);
-    })
+    // })
 
   } catch (error) {
       console.error('Error fetching data:', error.message);
@@ -97,6 +103,10 @@ convertTextToAudio('Hi I am zain ahmed, working at dominos', 'fr-FR');
 })
 
 app.get('/translate', async (req,res)=>{
+  res.json("working...")
+})
+
+app.get('/', async (req,res)=>{
   res.json("working...")
 })
 

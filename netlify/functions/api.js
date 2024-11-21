@@ -15,22 +15,58 @@ const cors = require('cors');
 const { default: axios } = require('axios')
 app.options('*', cors());
 app.use(cors());
+const createReadStream = require('fs').createReadStream;
 
 const api = express();
+
+const { google } = require('googleapis');
+
+// Downloaded from while creating credentials of service account
+const pkey = require('./pk.json');
+
+const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+
+async function authorize() {
+  const jwtClient = new google.auth.JWT(
+    pkey.client_email,
+    null,
+    pkey.private_key,
+    SCOPES
+  )
+  await jwtClient.authorize();
+  return jwtClient;
+}
+async function uploadFile(authClient) {
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+    const file = await drive.files.create({
+      media: {
+        body: createReadStream('https://asset.cloudinary.com/zainahmed/c556f323d5036708a186475ab7d82b86')
+      },
+      fields: 'id',
+      requestBody: {
+        name: path.basename('https://asset.cloudinary.com/zainahmed/c556f323d5036708a186475ab7d82b86'),
+      },
+    });
+    console.log("file",file.data.id)
+    return file.data.id
+}
+
 
 const speechToText = async (language, url, res) => {
     const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
     try {
-      const fileName = 'netlify/functions/media/'+Date()+'.mp3'
-      const localPath  = fs.createWriteStream('./'+fileName)
+      // const fileName = 'netlify/functions/media/'+Date()+'.mp3'
+      // const localPath  = fs.createWriteStream('./'+fileName)
+    //  const id =  await authorize().then(uploadFile)
+    //  console.log("id",id)
+      // https.get(url, async (response)=> {
   
-      https.get(url, async (response)=> {
-  
-         response.pipe(localPath)
+      //    response.pipe(localPath)
          
-         setTimeout( async () => {
+      //    setTimeout( async () => {
         
-        const uploadResult = await fileManager.uploadFile(fileName,{
+        const uploadResult = await fileManager.uploadFile('1rswysiVwUho1a1rHlt8nJtUu5AVJ2xE7',{
           mimeType: "audio/mp3",
           displayName: "Audio sample",
         });
@@ -64,8 +100,8 @@ const speechToText = async (language, url, res) => {
         ]);
         res.json(result.response.text())
         // return  result.response.text()
-        }, 2000);
-      })
+      //   }, 2000);
+      // })
   
     } catch (error) {
         console.error('Error fetching data:', error.message);
