@@ -147,6 +147,6 @@ app.get('/', (req, res) => {
 res.json('working...')
 })
 
-server.listen(port, () => {
-  console.log(`server Example app listening on port ${port}`);
+server.listen(Port, () => {
+  console.log(`server Example app listening on port ${Port}`);
 });
