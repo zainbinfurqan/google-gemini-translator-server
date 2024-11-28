@@ -1,6 +1,6 @@
 const express = require('express')
 const app = express()
-const port = 3001
+const Port = process.env.PORT || 3001;
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 const { GoogleAIFileManager, FileState  } = require('@google/generative-ai/server')
 const textToSpeech = require('@google-cloud/text-to-speech');
