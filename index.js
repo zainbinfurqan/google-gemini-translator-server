@@ -6,110 +6,147 @@ const { GoogleAIFileManager, FileState  } = require('@google/generative-ai/serve
 const textToSpeech = require('@google-cloud/text-to-speech');
 const fs = require('fs');
 const https = require('https');
+const http = require('http');
 const path = require('path');
 require('dotenv').config()
 const { Router } = require('express')
+const bodyParser = require('body-parser')
 
 const cors = require('cors');
 const { default: axios } = require('axios')
+const { Server } = require('http')
 app.options('*', cors());
 app.use(cors());
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded())
+const socketIo = require('socket.io');
 
-// cloudinary.config({
-//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-//   api_key: process.env.CLOUDINARY_API_KEY,
-//   api_secret: process.env.CLOUDINARY_API_SECRET
-// });
+app.use(bodyParser.json())
+const server = http.createServer(app);
 
-const speechToText = async (language, url, res) => {
+const io = socketIo(server, {
+  cors: {
+    origin: "*", // Allow any origin for simplicity; adjust as necessary
+    methods: ["GET", "POST"]
+  }
+});
+
+// app.post('/api/askai',  async (req, res) => {
+//   const body  = req.body
+//   console.log(body)
+//   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
+//   const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
+//   const model = genAI.getGenerativeModel({
+//     model: "gemini-1.5-flash",
+//   });
+
+//   const uploadResponse = await fileManager.uploadFile(`media/${body.bookId}.pdf`,{
+//     mimeType: "application/pdf",
+//     displayName: `media/${body.bookId}.pdf`,
+//   });
+
+//   console.log(
+//     `Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`,
+//   );
+
+//   const result = await model.generateContentStream([
+//     {
+//       fileData: {
+//         mimeType: uploadResponse.file.mimeType,
+//         fileUri: uploadResponse.file.uri,
+//       },
+//     },
+//     { text: body.query },
+//   ]);
+//   for await (const chunk of result.stream) {
+//     const chunkText = chunk.text();
+//     console.log("chunkText",chunkText)
+//   }
+//   // console.log("result",result.response.text())
+//   res.json(result.response.text())
+// })
+
+io.on('connection',  async (socket) => {
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
   const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
-  try {
-    const fileName = 'media/'+Date()+'.mp3'
-    const localPath  = fs.createWriteStream('./'+fileName)
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+  });
 
-    // https.get(url, async (response)=> {
+  let uploadResponse = null
 
-      //  response.pipe(localPath)
-       
-       setTimeout( async () => {
-      
-      const uploadResult = await fileManager.uploadFile('https://asset.cloudinary.com/zainahmed/c556f323d5036708a186475ab7d82b86',{
-        mimeType: "audio/mp3",
-        displayName: "Audio sample",
+  //-------book-selected------//
+  socket.on('book-selected', async (data)=>{
+    if(uploadResponse) {
+    } else {
+      uploadResponse = await fileManager.uploadFile(`media/${data.bookId}.pdf`,{
+        mimeType: "application/pdf",
+        displayName: `media/${data.bookId}.pdf`,
       });
-
-      let file = await fileManager.getFile(uploadResult.file.name);
-
-      while (file.state === FileState.PROCESSING) {
-        process.stdout.write(".");
-        await new Promise((resolve) => setTimeout(resolve, 10_000));
-        file = await fileManager.getFile(uploadResult.file.name);
-      }
-
-      if (file.state === FileState.FAILED) {
-        throw new Error("Audio processing failed.");
-      }
-  
+    
       console.log(
-        `Uploaded file ${uploadResult.file.displayName} as: ${uploadResult.file.uri}`,
+        `Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`,
       );
-      
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent([
-      `convert the audio in text and translate the text in ${'german'} language`,
+    }
+  })
+  //-------book-selected------//
+ 
+  //-------ask-ai-model------//
+  socket.on('ask-ai-model', async (data)=>{
+    if(uploadResponse) {
+      const result = await model.generateContentStream([
         {
           fileData: {
-            fileUri: uploadResult.file.uri,
-            mimeType: uploadResult.file.mimeType,
+            mimeType: uploadResponse.file.mimeType,
+            fileUri: uploadResponse.file.uri,
           },
         },
+        { text: data.query + 'from this uploaded file' },
       ]);
-      res.json(result.response.text())
-      return  result.response.text()
-      }, 2000);
-    // })
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        socket.emit('answer-by-ai-model',{ isEnd: false, data: chunkText})
+      }
+      socket.emit('answer-by-ai-model',{ isEnd: true, data: ''})
+    }else{
+      uploadResponse = await fileManager.uploadFile(`media/${data.bookId}.pdf`,{
+        mimeType: "application/pdf",
+        displayName: `media/${data.bookId}.pdf`,
+      });
+    
+      console.log(
+        `Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`,
+      );
 
-  } catch (error) {
-      console.error('Error fetching data:', error.message);
-  }
-}
+      const result = await model.generateContentStream([
+        {
+          fileData: {
+            mimeType: uploadResponse.file.mimeType,
+            fileUri: uploadResponse.file.uri,
+          },
+        },
+        { text: data.query + 'from this uploaded file' },
+      ]);
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        socket.emit('answer-by-ai-model',{ isEnd: false, data: chunkText})
+      }
+      socket.emit('answer-by-ai-model',{ isEnd: true, data: ''})
+    }
+  })
+  //-------ask-ai-model------//
 
-app.get('/speech-to-text', async (req, res) => {
-  await speechToText(req.query.language,req.query.url, res)
+  //-------disconnect------//
+  socket.on('disconnect', () => {
+    console.log('A user disconnected');
+  });
+  //-------disconnect------//
+});
+
+app.get('/', (req, res) => {
+res.json('working...')
 })
 
-app.get('/convert-text-to-speech', async (req,res)=>{
-  // Create a client
-const client = new textToSpeech.TextToSpeechClient();
-
-async function convertTextToAudio(text, languageCode = 'es-ES') { // Default to Spanish (Spain)
-  const request = {
-    input: { text },
-    voice: { languageCode: languageCode, ssmlGender: 'NEUTRAL' },
-    audioConfig: { audioEncoding: 'MP3' },
-  };
-
-  // Perform the text-to-speech request
-  const [response] = await client.synthesizeSpeech(request);
-
-  // Write the binary audio content to a file
-  const outputFilePath = path.join(__dirname, 'output.mp3');
-  fs.writeFileSync(outputFilePath, response.audioContent, 'binary');
-  console.log('Audio content written to file: ' + outputFilePath);
-}
-// Example usage
-convertTextToAudio('Hi I am zain ahmed, working at dominos', 'fr-FR');
-})
-
-app.get('/translate', async (req,res)=>{
-  res.json("working...")
-})
-
-app.get('/', async (req,res)=>{
-  res.json("working...")
-})
-
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+server.listen(port, () => {
+  console.log(`server Example app listening on port ${port}`);
+});
