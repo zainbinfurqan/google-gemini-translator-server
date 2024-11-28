@@ -67,6 +67,7 @@ const io = socketIo(server, {
 // })
 
 io.on('connection',  async (socket) => {
+  console.log('A user connected');
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
   const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
   const model = genAI.getGenerativeModel({
