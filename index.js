@@ -121,7 +121,7 @@ io.on('connection',  async (socket) => {
 
         const result = await generateContent(uploadResponse, data)
   
-      await returnStreamChunk(result, socket1)
+      await returnStreamChunk(result, socket)
        
         socket.emit('answer-by-ai-model',{ isError: false, isEnd: true, data: ''})
       } catch (error) {
@@ -137,7 +137,7 @@ io.on('connection',  async (socket) => {
   
         const result = await generateContent(uploadResponse, data)
   
-      await returnStreamChunk(result, socket1)
+      await returnStreamChunk(result, socket)
   
         socket.emit('answer-by-ai-model',{ isError: false, isEnd: true, data: ''})
       } catch (error) {
