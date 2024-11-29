@@ -65,29 +65,50 @@ const io = socketIo(server, {
 //   // console.log("result",result.response.text())
 //   res.json(result.response.text())
 // })
-
-io.on('connection',  async (socket) => {
-  console.log('A user connected');
+const generateContent = async (uploadResponse, data) => {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
-  const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
   });
+  return result = await model.generateContentStream([
+    {
+      fileData: {
+        mimeType: uploadResponse.file.mimeType,
+        fileUri: uploadResponse.file.uri,
+      },
+    },
+    { text: data.query + 'from this uploaded file' },
+  ]);
+}
 
+const uploadResponseFn = async (data) => {
+  const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GEMINI_KEY);
+ return fileManager.uploadFile(`media/${data.bookId}.pdf`,{
+    mimeType: "application/pdf",
+    displayName: `media/${data.bookId}.pdf`,
+  });
+}
+
+const returnStreamChunk = async (result, socket) => {
+  for await (const chunk of result.stream) {
+    const chunkText = chunk.text();
+    console.log("chunkText",chunkText)
+    socket.emit('answer-by-ai-model',{ isEnd: false, data: chunkText})
+  }
+}
+
+io.on('connection',  async (socket) => {
+  console.log('A user connected');
+  
   let uploadResponse = null
 
   //-------book-selected------//
   socket.on('book-selected', async (data)=>{
     if(uploadResponse) {
     } else {
-      uploadResponse = await fileManager.uploadFile(`media/${data.bookId}.pdf`,{
-        mimeType: "application/pdf",
-        displayName: `media/${data.bookId}.pdf`,
-      });
+      uploadResponse = await uploadResponseFn(data);
     
-      console.log(
-        `Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`,
-      );
+      console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
     }
   })
   //-------book-selected------//
@@ -95,44 +116,34 @@ io.on('connection',  async (socket) => {
   //-------ask-ai-model------//
   socket.on('ask-ai-model', async (data)=>{
     if(uploadResponse) {
-      const result = await model.generateContentStream([
-        {
-          fileData: {
-            mimeType: uploadResponse.file.mimeType,
-            fileUri: uploadResponse.file.uri,
-          },
-        },
-        { text: data.query + 'from this uploaded file' },
-      ]);
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        socket.emit('answer-by-ai-model',{ isEnd: false, data: chunkText})
-      }
-      socket.emit('answer-by-ai-model',{ isEnd: true, data: ''})
-    }else{
-      uploadResponse = await fileManager.uploadFile(`media/${data.bookId}.pdf`,{
-        mimeType: "application/pdf",
-        displayName: `media/${data.bookId}.pdf`,
-      });
-    
-      console.log(
-        `Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`,
-      );
+      try {
+        console.log("uploadResponse",uploadResponse)
 
-      const result = await model.generateContentStream([
-        {
-          fileData: {
-            mimeType: uploadResponse.file.mimeType,
-            fileUri: uploadResponse.file.uri,
-          },
-        },
-        { text: data.query + 'from this uploaded file' },
-      ]);
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        socket.emit('answer-by-ai-model',{ isEnd: false, data: chunkText})
+        const result = await generateContent(uploadResponse, data)
+  
+      await returnStreamChunk(result, socket1)
+       
+        socket.emit('answer-by-ai-model',{ isError: false, isEnd: true, data: ''})
+      } catch (error) {
+        socket.emit('answer-by-ai-model',{ isError: true, isEnd: true, data: ''})
+        console.log("error",error)
       }
-      socket.emit('answer-by-ai-model',{ isEnd: true, data: ''})
+    } else {
+
+      try {
+        uploadResponse = await uploadResponseFn(data)
+    
+        console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
+  
+        const result = await generateContent(uploadResponse, data)
+  
+      await returnStreamChunk(result, socket1)
+  
+        socket.emit('answer-by-ai-model',{ isError: false, isEnd: true, data: ''})
+      } catch (error) {
+        socket.emit('answer-by-ai-model',{ isError: true, isEnd: true, data: ''})
+        console.log("error",error)
+      }
     }
   })
   //-------ask-ai-model------//
