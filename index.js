@@ -70,10 +70,8 @@ const generateContent = async (uploadResponse, data) => {
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
   });
-  let queryBuilder = data.query + 'from this uploaded file'
-  if(data.language != null) {
-    queryBuilder + 'also convert this text to ' + data.language
-  }
+
+  
   return result = await model.generateContentStream([
     {
       fileData: {
